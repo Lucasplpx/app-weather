@@ -1,105 +1,81 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { FlatList, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import * as Location from 'expo-location';
 import Conditions from '../../components/Conditions';
 import Forecast from '../../components/Forecast';
 import Header from '../../components/Header';
 import Menu from '../../components/Menu';
-
-const DATA = [
-  {
-    date: '17/03',
-    weekday: 'Qua',
-    max: 26,
-    min: 18,
-    description: 'Tempestades isoladas',
-    condition: 'storm',
-  },
-  {
-    date: '18/03',
-    weekday: 'Qui',
-    max: 29,
-    min: 18,
-    description: 'Tempo nublado',
-    condition: 'cloud',
-  },
-  {
-    date: '19/03',
-    weekday: 'Sex',
-    max: 27,
-    min: 18,
-    description: 'Tempestades',
-    condition: 'storm',
-  },
-  {
-    date: '20/03',
-    weekday: 'Sáb',
-    max: 28,
-    min: 18,
-    description: 'Tempestades',
-    condition: 'storm',
-  },
-  {
-    date: '21/03',
-    weekday: 'Dom',
-    max: 28,
-    min: 18,
-    description: 'Ensolarado com muitas nuvens',
-    condition: 'cloudly_day',
-  },
-  {
-    date: '22/03',
-    weekday: 'Seg',
-    max: 28,
-    min: 18,
-    description: 'Parcialmente nublado',
-    condition: 'cloudly_day',
-  },
-  {
-    date: '23/03',
-    weekday: 'Ter',
-    max: 30,
-    min: 20,
-    description: 'Parcialmente nublado',
-    condition: 'cloudly_day',
-  },
-  {
-    date: '24/03',
-    weekday: 'Qua',
-    max: 30,
-    min: 21,
-    description: 'Parcialmente nublado',
-    condition: 'cloudly_day',
-  },
-  {
-    date: '25/03',
-    weekday: 'Qui',
-    max: 30,
-    min: 20,
-    description: 'Parcialmente nublado',
-    condition: 'cloudly_day',
-  },
-  {
-    date: '26/03',
-    weekday: 'Sex',
-    max: 29,
-    min: 21,
-    description: 'Ensolarado com muitas nuvens',
-    condition: 'cloudly_day',
-  },
-];
+import api, { key } from '../../services/api';
 
 const Home = () => {
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState(null);
+  const [weather, setWeather] = useState([]);
+  const [icon, setIcon] = useState({ name: 'cloud', color: '#fff' });
+  const [background, setBackground] = useState(['#1ed6ff', '#97c1ff']);
+
+  useEffect(() => {
+    (async () => {
+      const { status } = await Location.requestPermissionsAsync();
+
+      if (status !== 'granted') {
+        setErrorMsg('Permissão nega para acessar a localização');
+        setLoading(false);
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+
+      const { latitude, longitude } = location.coords;
+
+      const resp = await api.get(
+        `weather?key=${key}&lat=${latitude}&lon=${longitude}`
+      );
+
+      setWeather(resp.data);
+
+      if (resp.data.results.currently === 'noite') {
+        setBackground(['#0c3741', '#0f2f61']);
+      }
+
+      switch (resp.data.results.condition_slug) {
+        case 'clear_day':
+          setIcon({ name: 'partly-sunny', color: '#ffb300' });
+          break;
+        case 'rain':
+          setIcon({ name: 'rainy', color: '#fff' });
+          break;
+        case 'storm':
+          setIcon({ name: 'rainy', color: '#fff' });
+          break;
+      }
+
+      setLoading(false);
+    })();
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <Text style={{ fontSize: 17, fontStyle: 'italic' }}>
+          Carregando dados...
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <Menu />
-      <Header />
-      <Conditions />
+      <Header background={background} weather={weather} icon={icon} />
+      <Conditions weather={weather} />
 
       <FlatList
+        showsHorizontalScrollIndicator={false}
         horizontal={true}
         contentContainerStyle={{ paddingBottom: '5%' }}
         style={styles.list}
-        data={DATA}
+        data={weather.results.forecast}
         keyExtractor={(item) => item.date}
         renderItem={({ item }) => <Forecast data={item} />}
       />
